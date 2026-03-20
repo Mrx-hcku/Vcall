@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ZARA — Voice AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Nunito:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+:root {
+  --bg: #06080f;
+  --cyan: #00e5ff;
+  --pink: #ff3d8a;
+  --soft: #e8d5f5;
+  --glass: rgba(255,255,255,0.04);
+  --border: rgba(0,229,255,0.14);
+}
+body {
+  background: var(--bg);
+  font-family: 'Nunito', sans-serif;
+  color: var(--soft);
+  height: 100vh; height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* BG */
+.ambient {
+  position:fixed; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,120,200,0.13), transparent),
+    radial-gradient(ellipse 50% 40% at 85% 100%, rgba(180,0,100,0.09), transparent),
+    radial-gradient(ellipse 40% 40% at 10% 70%, rgba(100,0,200,0.06), transparent);
+}
+
+/* Header */
+.header {
+  position:relative; z-index:10;
+  width:100%; max-width:420px;
+  padding:12px 20px 0;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.logo {
+  font-family:'Orbitron',monospace; font-size:22px; font-weight:900; letter-spacing:7px;
+  background:linear-gradient(135deg,var(--cyan),var(--pink));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.status {
+  display:flex; align-items:center; gap:6px;
+  font-family:'Orbitron',monospace; font-size:9px; letter-spacing:2px; color:var(--cyan); opacity:.7;
+}
+.dot {
+  width:7px; height:7px; border-radius:50%;
+  background:#00ff88; box-shadow:0 0 8px #00ff88; animation:dp 2s infinite;
+}
+@keyframes dp{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* 3D Canvas */
+.face-wrap {
+  position:relative; z-index:10;
+  margin-top:6px;
+  width:230px; height:230px;
+}
+#threeCanvas {
+  border-radius:50%;
+  filter: drop-shadow(0 0 28px rgba(0,200,255,0.22));
+}
+.ring1, .ring2 {
+  position:absolute; border-radius:50%; border:1.5px solid transparent; pointer-events:none;
+}
+.ring1 { inset:-12px; border-top-color:var(--cyan); border-right-color:rgba(0,229,255,0.2); animation:rr 5s linear infinite; }
+.ring2 { inset:-22px; border-bottom-color:var(--pink); border-left-color:rgba(255,61,138,0.2); animation:rr 8s linear infinite reverse; }
+@keyframes rr{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+/* Name */
+.zara-name {
+  position:relative; z-index:10; margin-top:8px;
+  font-family:'Orbitron',monospace; font-size:26px; font-weight:900; letter-spacing:9px;
+  background:linear-gradient(135deg,#fff 30%,var(--cyan));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.zara-sub {
+  position:relative; z-index:10;
+  font-size:10px; letter-spacing:3px; color:rgba(232,213,245,.35); margin-top:2px;
+}
+
+/* Mood */
+.mood {
+  position:relative; z-index:10; margin-top:8px;
+  display:flex; align-items:center; gap:7px;
+  font-size:13px; color:rgba(232,213,245,.55);
+}
+.mood-icon { font-size:18px; transition:all .4s; }
+
+/* Bubble */
+.bubble {
+  position:relative; z-index:10;
+  margin:10px 20px 0; width:calc(100% - 40px); max-width:370px;
+  background:var(--glass); border:1px solid var(--border);
+  border-radius:16px; padding:12px 16px;
+  backdrop-filter:blur(12px); min-height:50px;
+  font-size:13.5px; line-height:1.7; color:rgba(232,213,245,.9);
+}
+.bubble::before {
+  content:''; position:absolute; top:-7px; left:50%; transform:translateX(-50%);
+  border:7px solid transparent; border-bottom-color:var(--border); border-top:none;
+}
+.tcursor {
+  display:inline-block; width:2px; height:14px; background:var(--cyan);
+  margin-left:2px; vertical-align:middle; animation:bl .8s infinite;
+}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:0}}
+
+/* Mic btn */
+.voice-area {
+  position:relative; z-index:10;
+  display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:14px;
+}
+.mic-btn {
+  width:64px; height:64px; border-radius:50%;
+  background:linear-gradient(135deg,rgba(0,229,255,.12),rgba(255,61,138,.12));
+  border:1.5px solid rgba(0,229,255,.28);
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all .3s; position:relative;
+  box-shadow:0 0 22px rgba(0,229,255,.1);
+  -webkit-user-select:none; user-select:none;
+}
+.mic-btn.listening {
+  border-color:var(--cyan);
+  box-shadow:0 0 50px rgba(0,229,255,.4);
+  animation:mp 1s infinite;
+}
+@keyframes mp{0%,100%{box-shadow:0 0 30px rgba(0,229,255,.3)}50%{box-shadow:0 0 60px rgba(0,229,255,.6),0 0 80px rgba(255,61,138,.3)}}
+.mic-btn.speaking {
+  border-color:var(--pink);
+  box-shadow:0 0 40px rgba(255,61,138,.4);
+  animation:sp .6s infinite alternate;
+}
+@keyframes sp{from{transform:scale(1)}to{transform:scale(1.07)}}
+.mic-icon { font-size:26px; pointer-events:none; }
+.mic-lbl {
+  font-size:10px; letter-spacing:2px; color:rgba(232,213,245,.4);
+  font-family:'Orbitron',monospace;
+}
+/* Wave rings */
+.waves { position:absolute; inset:-16px; border-radius:50%; pointer-events:none; display:none; }
+.wave {
+  position:absolute; inset:0; border-radius:50%;
+  border:1.5px solid rgba(0,229,255,.4); animation:wo 1.5s infinite;
+}
+.wave:nth-child(2){animation-delay:.5s}.wave:nth-child(3){animation-delay:1s}
+@keyframes wo{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.8);opacity:0}}
+.mic-btn.listening .waves{display:block;}
+
+/* Fallback */
+.fallback {
+  position:relative; z-index:10;
+  display:none; flex-direction:row; gap:8px;
+  margin-top:6px; width:calc(100% - 40px); max-width:370px;
+}
+.fallback input {
+  flex:1; background:var(--glass); border:1px solid var(--border);
+  border-radius:12px; padding:10px 14px; color:var(--soft);
+  font-family:'Nunito',sans-serif; font-size:14px; outline:none;
+}
+.fallback input:focus{border-color:rgba(0,229,255,.4);}
+.fallback button {
+  padding:10px 16px; border-radius:12px;
+  background:linear-gradient(135deg,var(--cyan),var(--pink));
+  border:none; color:#000; font-weight:700; cursor:pointer;
+  font-size:12px; font-family:'Orbitron',monospace;
+}
+#ft {
+  position:relative; z-index:10; font-size:10px;
+  color:rgba(232,213,245,.25); cursor:pointer; margin-top:5px;
+  font-family:'Orbitron',monospace; letter-spacing:1px;
+}
+#ft:hover{color:var(--cyan);}
+
+/* Corners */
+.corner{position:fixed;width:40px;height:40px;z-index:5;opacity:.3;}
+.tl{top:8px;left:8px;border-top:1.5px solid var(--cyan);border-left:1.5px solid var(--cyan);}
+.tr{top:8px;right:8px;border-top:1.5px solid var(--cyan);border-right:1.5px solid var(--cyan);}
+.bl{bottom:8px;left:8px;border-bottom:1.5px solid var(--pink);border-left:1.5px solid var(--pink);}
+.br{bottom:8px;right:8px;border-bottom:1.5px solid var(--pink);border-right:1.5px solid var(--pink);}
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+<div class="corner tl"></div><div class="corner tr"></div>
+<div class="corner bl"></div><div class="corner br"></div>
+
+<div class="header">
+  <div class="logo">ZARA</div>
+  <div class="status"><div class="dot"></div>ONLINE</div>
+</div>
+
+<div class="face-wrap">
+  <div class="ring1"></div><div class="ring2"></div>
+  <canvas id="threeCanvas" width="230" height="230"></canvas>
+</div>
+
+<div class="zara-name">Z A R A</div>
+<div class="zara-sub">YOUR VOICE AI COMPANION</div>
+
+<div class="mood">
+  <span class="mood-icon" id="moodIcon">😊</span>
+  <span id="moodLbl">Ready hai...</span>
+</div>
+
+<div class="bubble">
+  <div id="zaraTxt">Heyy! Main ZARA hoon 🌟 Neeche mic dabao aur mujhse baat karo!<span class="tcursor"></span></div>
+</div>
+
+<div class="voice-area">
+  <div class="mic-btn" id="micBtn" onclick="toggleListen()">
+    <div class="waves"><div class="wave"></div><div class="wave"></div><div class="wave"></div></div>
+    <span class="mic-icon" id="micIcon">🎙️</span>
+  </div>
+  <div class="mic-lbl" id="micLbl">TAP TO SPEAK</div>
+</div>
+
+<div id="ft" onclick="toggleFallback()">⌨️ TYPE INSTEAD</div>
+<div class="fallback" id="fallbackArea">
+  <input type="text" id="txtInput" placeholder="Kuch bhi likho..." onkeydown="if(event.key==='Enter')sendText()"/>
+  <button onclick="sendText()">SEND</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  THREE.JS — PROPER PROPORTIONED 3D FACE
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('threeCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(230, 230);
+renderer.setClearColor(0x000000, 0);
+
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+cam.position.set(0, 0.05, 4.2);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xfff0ee, 0.7));
+const kl = new THREE.DirectionalLight(0x88ddff, 1.1);
+kl.position.set(2,3,5); scene.add(kl);
+const fl = new THREE.DirectionalLight(0xff88bb, 0.45);
+fl.position.set(-3,0,3); scene.add(fl);
+const rl = new THREE.DirectionalLight(0xffffff, 0.2);
+rl.position.set(0,2,-3); scene.add(rl);
+
+const head = new THREE.Group();
+scene.add(head);
+
+// — Skin material —
+const skinM = new THREE.MeshPhongMaterial({ color:0xf2c2a8, specular:0x221100, shininess:30 });
+const lipM  = new THREE.MeshPhongMaterial({ color:0xd44060, specular:0x441122, shininess:55 });
+const hairM = new THREE.MeshPhongMaterial({ color:0x0d0318, shininess:70 });
+const eyeWM = new THREE.MeshPhongMaterial({ color:0xffffff, shininess:90 });
+const teethM= new THREE.MeshPhongMaterial({ color:0xf8f8ee });
+
+// HEAD — slightly oval
+const headGeo = new THREE.SphereGeometry(1, 64, 64);
+const headMesh = new THREE.Mesh(headGeo, skinM);
+headMesh.scale.set(1, 1.12, 0.88);
+head.add(headMesh);
+
+// NECK
+const neckM = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.30,0.6,20), skinM);
+neckM.position.set(0,-1.3,0); head.add(neckM);
+
+// EARS
+function addEar(x) {
+  const e = new THREE.Mesh(new THREE.SphereGeometry(0.14,16,16), skinM);
+  e.scale.set(0.45,0.65,0.3); e.position.set(x*0.99,0.06,0.02); head.add(e);
+}
+addEar(-1); addEar(1);
+
+// EYES — positioned naturally
+function makeEye(xPos) {
+  const g = new THREE.Group();
+  g.position.set(xPos, 0.18, 0.82);
+
+  // Eyeball
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.14,32,32), eyeWM);
+  g.add(ball);
+
+  // Iris — gradient teal/brown
+  const irisM = new THREE.MeshPhongMaterial({ color: xPos<0 ? 0x2255aa : 0x116677, shininess:120 });
+  const iris = new THREE.Mesh(new THREE.CircleGeometry(0.088,32), irisM);
+  iris.position.z = 0.138; g.add(iris);
+
+  // Pupil
+  const pupil = new THREE.Mesh(
+    new THREE.CircleGeometry(0.048,32),
+    new THREE.MeshBasicMaterial({color:0x050505})
+  );
+  pupil.position.z = 0.140; g.add(pupil);
+
+  // Catchlight
+  const cl = new THREE.Mesh(
+    new THREE.CircleGeometry(0.018,16),
+    new THREE.MeshBasicMaterial({color:0xffffff})
+  );
+  cl.position.set(0.032,0.034,0.141); g.add(cl);
+
+  // Upper eyelid (skin colored, sits on top)
+  const lidM = new THREE.MeshPhongMaterial({color:0xeaaa90});
+  const lid = new THREE.Mesh(new THREE.SphereGeometry(0.148,32,16,0,Math.PI*2,0,Math.PI*0.5), lidM);
+  lid.rotation.x = Math.PI; lid.position.y = 0.01; g.add(lid);
+
+  // Lash line
+  const lashM = new THREE.MeshBasicMaterial({color:0x111111});
+  const lash = new THREE.Mesh(new THREE.TorusGeometry(0.13,0.012,8,32,Math.PI), lashM);
+  lash.position.set(0,0.01,0.12); g.add(lash);
+
+  head.add(g);
+  return g;
+}
+const eyeL = makeEye(-0.285);
+const eyeR = makeEye(0.285);
+
+// EYEBROWS — natural arch
+function makeBrow(xPos, flip) {
+  const pts = [];
+  for(let i=0;i<=12;i++){
+    const t=i/12;
+    pts.push(new THREE.Vector3((t-0.5)*0.28, Math.sin(t*Math.PI)*0.038*(flip?-1:1), 0));
+  }
+  const m = new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),20,0.016,8,false),
+    new THREE.MeshPhongMaterial({color:0x28100a})
+  );
+  m.position.set(xPos, 0.415, 0.875);
+  head.add(m);
+  return m;
+}
+const browL = makeBrow(-0.285, false);
+const browR = makeBrow(0.285, true);
+
+// NOSE — subtle, realistic
+const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.055,16,16), skinM);
+noseTip.scale.set(0.9,0.75,0.8); noseTip.position.set(0,-0.04,0.96); head.add(noseTip);
+const noseBridge = new THREE.Mesh(new THREE.SphereGeometry(0.035,12,12),
+  new THREE.MeshPhongMaterial({color:0xdfa898}));
+noseBridge.scale.set(0.7,2.2,0.6); noseBridge.position.set(0,0.13,0.93); head.add(noseBridge);
+// nostrils
+[-0.075,0.075].forEach(x => {
+  const n = new THREE.Mesh(new THREE.SphereGeometry(0.038,12,12),
+    new THREE.MeshPhongMaterial({color:0xdda090}));
+  n.scale.set(1,0.65,0.7); n.position.set(x,-0.07,0.925); head.add(n);
+});
+
+// MOUTH — lips
+const upperLip = new THREE.Mesh(
+  new THREE.TorusGeometry(0.155,0.032,8,32,Math.PI), lipM
+);
+upperLip.position.set(0,-0.295,0.885); head.add(upperLip);
+
+const lowerLip = new THREE.Mesh(
+  new THREE.TorusGeometry(0.165,0.042,8,32,Math.PI), lipM
+);
+lowerLip.rotation.x = Math.PI;
+lowerLip.position.set(0,-0.338,0.878); head.add(lowerLip);
+
+// Mouth corners
+[-0.155,0.155].forEach(x=>{
+  const c = new THREE.Mesh(new THREE.SphereGeometry(0.025,8,8),lipM);
+  c.position.set(x,-0.315,0.88); head.add(c);
+});
+
+// TEETH (hidden by default, shown when mouth opens)
+const teethMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(0.22,0.04,0.05), teethM
+);
+teethMesh.position.set(0,-0.31,0.88); teethMesh.visible=false; head.add(teethMesh);
+
+// CHEEKS blush
+const blushM = new THREE.MeshPhongMaterial({color:0xf09090,transparent:true,opacity:0.28});
+[-0.55,0.55].forEach(x=>{
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.2,16,16),blushM);
+  b.scale.set(1,0.65,0.4); b.position.set(x,0,0.72); head.add(b);
+});
+
+// HAIR — layered natural look
+// Back volume
+const hairBack = new THREE.Mesh(new THREE.SphereGeometry(1.06,32,32),hairM);
+hairBack.scale.set(1,1.05,0.7); hairBack.position.set(0,0.15,-0.22); head.add(hairBack);
+// Top
+const hairTop = new THREE.Mesh(new THREE.SphereGeometry(1.04,32,32),hairM);
+hairTop.scale.set(1.01,0.62,0.95); hairTop.position.set(0,0.78,0.18); head.add(hairTop);
+// Side L
+const sideL = new THREE.Mesh(new THREE.SphereGeometry(0.5,16,16),hairM);
+sideL.scale.set(0.55,1.15,0.5); sideL.position.set(-0.9,0.1,0.35); head.add(sideL);
+// Side R
+const sideR = new THREE.Mesh(new THREE.SphereGeometry(0.5,16,16),hairM);
+sideR.scale.set(0.55,1.15,0.5); sideR.position.set(0.9,0.1,0.35); head.add(sideR);
+// Bangs
+const bangC = new THREE.Mesh(new THREE.SphereGeometry(0.6,16,16),hairM);
+bangC.scale.set(1.1,0.38,0.55); bangC.position.set(0,0.72,0.72); head.add(bangC);
+// Hair shine highlight
+const hlM = new THREE.MeshPhongMaterial({color:0x6020a0,transparent:true,opacity:0.35,shininess:120});
+const hairHL = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16),hlM);
+hairHL.position.set(-0.25,1.08,0.42); head.add(hairHL);
+
+// ═══════════════════════════════════════════════
+//  ANIMATION
+// ═══════════════════════════════════════════════
+let appState = 'idle';
+let swayT=0, mouthOscT=0;
+let rotY=0,rotX=0,tRotY=0,tRotX=0;
+let mouthOpen=0,mouthTgt=0;
+let browRaise=0,browTgt=0;
+let smile=0,smileTgt=0.25;
+let blinkT=0,blinkState=0,blinkV=0;
+const clock3 = new THREE.Clock();
+
+function setExpr(e){
+  const map={
+    idle:     {brow:0,    smile:0.25, icon:'😊', lbl:'Ready hai...'},
+    listening:{brow:0.04, smile:0.05, icon:'👂', lbl:'Sun rahi hoon...'},
+    thinking: {brow:0.09, smile:0,    icon:'🤔', lbl:'Soch rahi hoon...'},
+    speaking: {brow:-0.02,smile:0.35, icon:'💬', lbl:'Bol rahi hoon...'},
+    happy:    {brow:-0.05,smile:0.55, icon:'😄', lbl:'Khush hoon!'},
+  };
+  const m=map[e]||map.idle;
+  browTgt=m.brow; smileTgt=m.smile;
+  document.getElementById('moodIcon').textContent=m.icon;
+  document.getElementById('moodLbl').textContent=m.lbl;
+}
+setExpr('idle');
+
+function animate3(){
+  requestAnimationFrame(animate3);
+  const dt=Math.min(clock3.getDelta(),0.05);
+  swayT+=dt; mouthOscT+=dt;
+
+  // Head movement per state
+  if(appState==='idle'){
+    tRotY=Math.sin(swayT*0.45)*0.06;
+    tRotX=Math.sin(swayT*0.3)*0.025;
+  } else if(appState==='listening'){
+    tRotY=Math.sin(swayT*0.3)*0.03;
+    tRotX=0.045;
+  } else if(appState==='thinking'){
+    tRotY=-0.1; tRotX=0.08;
+  } else if(appState==='speaking'){
+    tRotY=Math.sin(swayT*0.9)*0.045;
+    tRotX=Math.sin(swayT*0.65)*0.02;
+  }
+  rotY+=(tRotY-rotY)*5*dt;
+  rotX+=(tRotX-rotX)*5*dt;
+  head.rotation.y=rotY;
+  head.rotation.x=rotX;
+
+  // Brow
+  browRaise+=(browTgt-browRaise)*5*dt;
+  browL.position.y=0.415+browRaise;
+  browR.position.y=0.415+browRaise;
+
+  // Smile — moves lips apart
+  smile+=(smileTgt-smile)*4*dt;
+  upperLip.position.y=-0.295+smile*0.03;
+  lowerLip.position.y=-0.338-smile*0.04;
+
+  // Mouth open (lip sync)
+  mouthTgt = appState==='speaking'
+    ? 0.05+Math.abs(Math.sin(mouthOscT*9))*0.14
+    : 0;
+  mouthOpen+=(mouthTgt-mouthOpen)*12*dt;
+  upperLip.position.y=-0.295+smile*0.03+mouthOpen*0.5;
+  lowerLip.position.y=-0.338-smile*0.04-mouthOpen*0.7;
+  teethMesh.visible = mouthOpen>0.04;
+  teethMesh.position.y=-0.31-mouthOpen*0.1;
+
+  // Blink
+  blinkT+=dt;
+  if(blinkT>3.5+Math.random()&&blinkState===0){blinkState=1;blinkT=0;}
+  if(blinkState===1){blinkV+=dt*9;if(blinkV>=1){blinkV=1;blinkState=2;}}
+  if(blinkState===2){blinkV-=dt*9;if(blinkV<=0){blinkV=0;blinkState=0;}}
+  const eScale=1-blinkV*0.92;
+  eyeL.scale.y=eScale; eyeR.scale.y=eScale;
+
+  renderer.render(scene,cam);
+}
+animate3();
+
+// ═══════════════════════════════════════════════
+//  SPEECH — Safe for Android WebView
+// ═══════════════════════════════════════════════
+const hasSpeechRec = !!(window.SpeechRecognition||window.webkitSpeechRecognition);
+const hasTTS = !!(window.speechSynthesis);
+let isList=false, recog=null;
+let convHist=[];
+
+function showBubble(txt){
+  document.getElementById('zaraTxt').innerHTML=txt+'<span class="tcursor"></span>';
+}
+function setMicUI(s){
+  const btn=document.getElementById('micBtn');
+  const lbl=document.getElementById('micLbl');
+  const icn=document.getElementById('micIcon');
+  btn.className='mic-btn';
+  if(s==='listening'){btn.classList.add('listening');lbl.textContent='SUN RAHI HOON...';icn.textContent='🎧';}
+  else if(s==='speaking'){btn.classList.add('speaking');lbl.textContent='BOL RAHI HOON';icn.textContent='🔊';}
+  else{lbl.textContent='TAP TO SPEAK';icn.textContent='🎙️';}
+}
+
+// ═══════════════════════════════════════════════
+//  MIC PERMISSION
+// ═══════════════════════════════════════════════
+let micPermission = 'unknown'; // 'granted' | 'denied' | 'prompt' | 'unknown'
+
+async function checkMicPermission(){
+  try{
+    if(navigator.permissions){
+      const p = await navigator.permissions.query({name:'microphone'});
+      micPermission = p.state; // 'granted' | 'denied' | 'prompt'
+      p.onchange = ()=>{ micPermission = p.state; };
+    }
+  }catch(e){ micPermission = 'unknown'; }
+}
+
+async function requestMicPermission(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    // Permission granted — stop the stream, we just needed the grant
+    stream.getTracks().forEach(t=>t.stop());
+    micPermission = 'granted';
+    return true;
+  }catch(e){
+    micPermission = 'denied';
+    return false;
+  }
+}
+
+// Ask permission proactively on first tap
+async function ensureMicPermission(){
+  if(micPermission === 'granted') return true;
+  if(micPermission === 'denied'){
+    showBubble('Mic permission block hai 😕 Phone Settings → Apps → Browser → Permissions → Mic allow karo, phir wapas aao!');
+    return false;
+  }
+  // 'prompt' or 'unknown' — ask now
+  showBubble('Ek second... mic access chahiye 🎙️');
+  const ok = await requestMicPermission();
+  if(ok){
+    showBubble('Mic ready hai! Ab bolo 😊');
+  } else {
+    showBubble('Mic allow nahi hua 😔 Settings mein jaake allow karo, phir try karna!');
+    document.getElementById('fallbackArea').style.display='flex';
+  }
+  return ok;
+}
+
+// Run permission check silently on load
+checkMicPermission();
+
+function toggleListen(){
+  // Stop if speaking
+  if(hasTTS && window.speechSynthesis.speaking){ window.speechSynthesis.cancel(); endSpeak(); return; }
+  if(isList){stopListen();return;}
+  startListen();
+}
+
+async function startListen(){
+  if(!hasSpeechRec){
+    showBubble('Iss browser mein voice nahi chal sakta 😕 Neeche type karo!');
+    document.getElementById('fallbackArea').style.display='flex';
+    return;
+  }
+  // Check/request mic permission first
+  const allowed = await ensureMicPermission();
+  if(!allowed) return;
+
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recog=new SR();
+  recog.lang='hi-IN';
+  recog.continuous=false;
+  recog.interimResults=true;
+  recog.onstart=()=>{
+    isList=true; appState='listening'; setExpr('listening'); setMicUI('listening');
+    showBubble('🎧 Bol do...');
+  };
+  recog.onresult=(e)=>{
+    const t=Array.from(e.results).map(r=>r[0].transcript).join('');
+    showBubble('🎤 '+t);
+    if(e.results[e.results.length-1].isFinal){stopListen();askZara(t);}
+  };
+  recog.onerror=(e)=>{
+    stopListen();
+    if(e.error==='not-allowed') showBubble('Mic permission allow karo browser settings mein 🙏');
+    else showBubble('Kuch issue hua... dobara try karo! 😅');
+  };
+  recog.onend=()=>{if(isList)stopListen();};
+  try{recog.start();}catch(e){showBubble('Mic start nahi hua, try again!');}
+}
+
+function stopListen(){
+  isList=false; if(recog){try{recog.stop();}catch(e){}} setMicUI('idle');
+}
+
+async function askZara(userTxt){
+  appState='thinking'; setExpr('thinking'); setMicUI('idle');
+  showBubble('Soch rahi hoon... 🤔');
+  convHist.push({role:'user',content:userTxt});
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':'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','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:`You are ZARA — a warm, lively AI girl assistant. Speak in natural Hinglish (mix of Hindi + English like real Indian girls). Personality: friendly, caring, sometimes playful. Keep responses short (2-4 sentences max) — suitable for voice. Natural expressions: "Haan!", "Arre!", "Bilkul!", "Suno na", "Actually yaar". No markdown, no asterisks, plain text only. Sound human, not robotic.`,
+        messages:convHist
+      })
+    });
+    const data=await res.json();
+    const reply=data.content?.[0]?.text||'Arre kuch problem ho gayi yaar!';
+    convHist.push({role:'assistant',content:reply});
+    speakZara(reply);
+  }catch(e){
+    speakZara('Arre yaar network problem hai. Dobara try karo!');
+  }
+}
+
+function speakZara(txt){
+  appState='speaking'; setExpr('speaking'); setMicUI('speaking');
+  showBubble(txt);
+  if(!hasTTS){ endSpeak(); return; }
+  try{
+    window.speechSynthesis.cancel();
+    // Small delay — Android needs this
+    setTimeout(()=>{
+      const utt=new SpeechSynthesisUtterance(txt);
+      // Pick best female voice
+      const voices=window.speechSynthesis.getVoices();
+      const pick=
+        voices.find(v=>v.lang==='hi-IN')||
+        voices.find(v=>v.lang.startsWith('hi'))||
+        voices.find(v=>/heera|priya|zira|female|woman/i.test(v.name))||
+        voices.find(v=>v.lang==='en-IN')||
+        voices.find(v=>v.lang.startsWith('en'))||
+        null;
+      if(pick) utt.voice=pick;
+      utt.rate=0.9; utt.pitch=1.2; utt.volume=1;
+      utt.onend=endSpeak; utt.onerror=endSpeak;
+      window.speechSynthesis.speak(utt);
+    },150);
+  }catch(e){ endSpeak(); }
+}
+
+function endSpeak(){
+  appState='idle'; setExpr('idle'); setMicUI('idle');
+}
+
+// Text fallback
+function toggleFallback(){
+  const a=document.getElementById('fallbackArea');
+  a.style.display=a.style.display==='flex'?'none':'flex';
+}
+function sendText(){
+  const inp=document.getElementById('txtInput');
+  const t=inp.value.trim(); if(!t)return;
+  inp.value=''; askZara(t);
+}
+
+// Pre-load voices safely
+try{
+  if(hasTTS){
+    window.speechSynthesis.getVoices();
+    if(window.speechSynthesis.onvoiceschanged!==undefined)
+      window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
+  }
+}catch(e){}
+</script>
+</body>
+</html>
